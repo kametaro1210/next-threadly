@@ -11,3 +11,161 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// -----------------------------------------------------------------------------------
+
+/*
+  UserProfileモデルの定義。
+
+  作成される列:
+  - id: text型。主キー。値はアプリケーションから指定する。
+  - username: text型。重複できない。
+  - created_at: timestamptz(6)型。作成時刻を保存し、初期値は現在時刻。
+*/
+
+model UserProfile {
+  id String @id
+  username String @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // DB上に作成されるテーブル名の定義
+  @@map("user_profiles")
+}
+
+// -----------------------------------------------------------------------------------
+
+/*
+  投稿を保存するモデル。
+
+  作成される列:
+  - id: uuid型。投稿ID。自動でUUIDを設定する。
+  - author_id: text型。投稿者ID。
+  - title: text型。投稿タイトル。
+  - body: text型。投稿本文。
+  - created_at: timestamptz(6)型。作成時刻。初期値は現在時刻。
+
+  postTagsは、この投稿に紐づくPostTagを表すPrisma上の関連項目で、DB列ではない。
+  Postは親、PostTagは子。投稿を削除するとonDelete: Cascadeにより関連するPostTagも削除される。
+  authorIdは投稿者IDを保存する列だが、現状は他モデルとのリレーションを定義していない。
+*/
+
+model Post {
+  id        String   @id @default(uuid()) @db.Uuid
+  authorId  String   @map("author_id")
+  title     String
+  body      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  postTags PostTag[]
+  comments Comment[]
+
+  @@map("posts")
+}
+
+// -----------------------------------------------------------------------------------
+
+/*
+  タグを保存するモデル。
+
+  作成される列:
+  - slug: text型。タグを識別する主キー。
+  - label: text型。画面に表示するタグ名。
+  - hash_color: text型。タグの色。
+
+  postTagsは、このタグに紐づくPostTagを表すPrisma上の関連項目で、DB列ではない。
+  TagはPostTagの親。PostとはPostTagを介した多対多の関係になる。
+*/
+
+model Tag {
+  slug      String @id
+  label     String
+  hashColor String @map("hash_color")
+
+  postTags PostTag[]
+
+  @@map("tags")
+}
+
+// -----------------------------------------------------------------------------------
+
+/*
+  投稿とタグの関連を保存する中間モデル。
+
+  作成される列:
+  - post_id: uuid型。関連先の投稿ID。
+  - tag_slug: text型。関連先のタグslug。
+
+  @relationは、各IDを参照先のPost・Tagへ結び付ける外部キーの関係を定義する。
+  PostとTagが親、PostTagが子。投稿1件に複数のタグ、タグ1つに複数の投稿を結び付ける。
+  Postを削除すると関連するPostTagも削除されるが、Tag側にはCascadeを指定していない。
+  @@id([postId, tagSlug])は2列の組み合わせを主キーにし、同じ投稿とタグの重複登録を防ぐ。
+*/
+
+model PostTag {
+  postId  String @map("post_id") @db.Uuid
+  tagSlug String @map("tag_slug")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag Tag @relation(fields: [tagSlug], references: [slug])
+
+  @@id([postId, tagSlug])
+  @@map("post_tags")
+}
+
+// -----------------------------------------------------------------------------------
+
+/*
+  コメントを保存するモデル。
+
+  作成される列:
+  - id: uuid型。コメントID。自動でUUIDを設定する。
+  - post_id: uuid型。コメントが属する投稿ID。
+  - author_id: text型。コメントしたユーザーID。
+  - parent_id: uuid型。返信先コメントID。返信ではない場合はNULL。
+  - body: text型。コメント本文。
+  - created_at: timestamptz(6)型。作成時刻。初期値は現在時刻。
+
+  postはコメントが属するPostを表す関連項目で、DB列ではない。
+  Postは親、Commentは子。投稿を削除するとonDelete: Cascadeによりコメントも削除される。
+  parentIdは返信先IDを保存する列だが、現状はComment同士のリレーションを定義していない。
+*/
+
+model Comment {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  authorId  String   @map("author_id")
+  parentId  String?  @map("parent_id") @db.Uuid
+  body      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+// -----------------------------------------------------------------------------------
+
+/*
+  投稿やコメントへの投票を保存するモデル。
+
+  作成される列:
+  - user_id: text型。投票したユーザーID。
+  - target_type: text型。投票対象の種類。投稿またはコメントを表す。
+  - target_id: uuid型。投票対象の投稿IDまたはコメントID。
+  - value: smallint型。投票値。1は賛成、-1は反対を表す。
+
+  投稿とコメントの両方を対象にするため、targetIdはPost・Commentへの外部キーではなく、
+  targetTypeと組み合わせて対象を識別する。
+  @@id([userId, targetType, targetId])は3列の組み合わせを主キーにし、
+  同じユーザーが同じ対象に重複して投票することを防ぐ。
+*/
+
+model Vote {
+  userId     String @map("user_id")
+  targetType String @map("target_type")
+  targetId   String @map("target_id") @db.Uuid
+  value      Int    @db.SmallInt
+
+  @@id([userId, targetType, targetId])
+  @@map("votes")
+}
