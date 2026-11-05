@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 
 import { NeonAuthProviders } from "@/providers/neon-auth-ui-provider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// font変更
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -23,9 +24,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="ja"
-      className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`dark ${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        {/* 各ページの内容を認証プロバイダーで包み、共通の背景色と縦並びレイアウトで表示 */}
         <NeonAuthProviders>{children}</NeonAuthProviders>
       </body>
     </html>
