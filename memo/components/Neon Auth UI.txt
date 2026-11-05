@@ -1,0 +1,128 @@
+==========================================
+Neon Auth UIの導入と使い方
+==========================================
+
+Neon Auth UIでログイン・サインアップ画面を表示する方法と、
+画面の設定場所を説明します。
+
+------------------------------------------
+1. Neon Auth UIとは
+------------------------------------------
+
+Neon Auth UIは、Neon Authが提供するログインやサインアップ用の画面です。
+画面のフォームや認証処理を一から作らずに利用できます。
+
+このプロジェクトでは、AuthViewが画面を表示し、
+NeonAuthUIProviderが認証クライアントを画面全体に渡します。
+
+------------------------------------------
+2. インストールと事前準備
+------------------------------------------
+
+使用するパッケージ:
+
+npm install @neondatabase/auth
+
+このプロジェクトではすでにインストールされています。
+別途、認証画面用のパッケージを追加する必要はありません。
+
+また、Neon側でAuthを有効にし、接続に必要な設定を環境変数に登録します。
+認証サービスのURLはNeonのプロジェクト設定で確認してください。
+Cookie用の秘密鍵は32文字以上にし、Gitに登録しないでください。
+.env.localなどに設定し、本番環境ではホスティングサービスの環境変数に登録します。
+
+------------------------------------------
+3. 認証APIを設定する（必須）
+------------------------------------------
+
+AuthViewは画面を表示しますが、ログインや登録の通信先は別に必要です。
+Next.jsにRoute Handlerを作り、認証リクエストをNeon Authへ中継します。
+
+ログインやサインアップを動かす下記2つの追加が必要です。
+
+まずlib\auth.tsを作成します。
+
+import { createNeonAuth } from "@neondatabase/auth/next/server";
+
+export const auth = createNeonAuth({
+  baseUrl: process.env.NEON_AUTH_BASE_URL!,
+  cookies: {
+    secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+  },
+});
+
+次にapp\api\auth\[...path]\route.tsを作成します。
+
+import { auth } from "@/lib/auth";
+
+export const { GET, POST, PUT, DELETE, PATCH } = auth.handler();
+
+[...path]は、/api/auth以下の複数のパスをまとめて受け取る書き方です。
+このRoute Handlerが、画面から届いた認証リクエストをNeon Authへ中継します。
+
+ログインやサインアップを動かすにはこれらの追加が必要です。
+
+------------------------------------------
+4. 認証画面を表示する
+------------------------------------------
+
+画面の表示にはAuthViewを使います。
+
+app\auth\[pathname]\page.tsx
+
+[pathname]の角括弧は、URLの一部を受け取る動的なフォルダを表します。
+たとえば /auth/sign-in ではpathnameが「sign-in」、
+/auth/sign-up では「sign-up」になります。
+AuthViewは受け取った値に応じてログイン画面やサインアップ画面を表示します。
+
+認証クライアントと画面全体への設定は、次のファイルで行っています。
+
+providers\neon-auth-ui-provider.tsx
+app\layout.tsx
+
+NeonAuthUIProviderをルートレイアウトで使うことで、
+各ページから認証機能を利用できます。
+
+------------------------------------------
+5. 入力項目や表示文言を変更する
+------------------------------------------
+
+名前やパスワード以外の項目も追加できます。
+NeonAuthUIProviderのadditionalFieldsに項目名、種類、ラベル、
+プレースホルダーなどを設定します。
+
+ただし、入力欄を表示するだけでは保存できません。
+追加する情報をNeon Auth側でも受け付けて保存できるように設定してください。
+ログイン方法やサインアップ時の動作も、Neon Authの設定やProviderの設定に従います。
+
+日本語のラベル、説明文、プレースホルダーは次のファイルで設定します。
+
+lib\auth-localization.ts
+
+------------------------------------------
+6. CSSの読み込み場所
+------------------------------------------
+
+Neon Auth UI用のTailwind CSSは、app\globals.cssで読み込んでいます。
+
+@import "@neondatabase/auth/ui/tailwind";
+
+このCSSファイルはapp\layout.tsxから読み込まれるため、
+認証画面を含むアプリ全体にスタイルが適用されます。
+
+------------------------------------------
+7. 導入時に確認する順番
+------------------------------------------
+
+1. Neon側でAuthを有効にし、必要な接続設定を用意する。
+2. @neondatabase/authをインストールする。
+3. .env.localなどに認証サービスのURLと32文字以上の秘密鍵を設定する。
+4. lib\auth.tsとapp\api\auth\[...path]\route.tsで認証APIを設定する。
+5. NeonAuthUIProviderと認証クライアントを設定する。
+6. app\layout.tsxでProviderをアプリ全体に適用する。
+7. app\auth\[pathname]\page.tsxでAuthViewを表示する。
+8. app\globals.cssでNeon Auth UIのCSSを読み込む。
+9. 表示文言を変える場合はlib\auth-localization.tsを編集する。
+
+ログイン必須のページを制限したい場合は、別途Neon AuthのMiddlewareを設定します。
+画面表示やログイン・登録を動かすだけなら、Middlewareは必須ではありません。
