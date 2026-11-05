@@ -11,3 +11,25 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// -----------------------------------------------------------------------------------
+
+/*
+  UserProfileモデルの定義。
+
+  作成される列:
+  - id: text型。主キー。値はアプリケーションから指定する。
+  - username: text型。重複できない。
+  - created_at: timestamptz(6)型。作成時刻を保存し、初期値は現在時刻。
+*/
+
+model UserProfile {
+  id String @id
+  username String @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // DB上に作成されるテーブル名の定義
+  @@map("user_profiles")
+}
+
+// -----------------------------------------------------------------------------------

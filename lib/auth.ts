@@ -1,5 +1,7 @@
 import { createNeonAuth } from "@neondatabase/auth/next/server";
 import { cache } from "react";
+import { ensureUserProfile } from "./db/user-profile";
+import { User } from "./types";
 
 /**
  * 認証機能の初期化
@@ -31,4 +33,23 @@ export const auth = createNeonAuth({
 export const getCurrentUserId = cache(async (): Promise<string | undefined> => {
   const { data: session } = await auth.getSession();
   return session?.user.id;
+});
+
+// -------------------------------------------------------------------------------
+
+/**
+ * セッションからアプリ用ユーザー情報を取得
+ *
+ * 【目的】ログイン中のユーザーをアプリ内で使える形式にして返す。
+ * 【受け取る値】関数の引数はなし。auth.getSession()が現在のリクエストからログイン情報を取得する。
+ * 【返す値】Promise<User | null>。Promiseは後から結果が届くことを表し、
+ *          ログイン中はアプリ用ユーザー情報、未ログインならnullになる。
+ * 【処理】ログイン中ならensureUserProfileでプロフィールを取得し、
+ *         未作成の場合は作成する。Reactのcacheは同じサーバー処理中の重複呼び出しで結果を再利用する。
+ */
+
+export const getSessionUser = cache(async (): Promise<User | null> => {
+  const { data: session } = await auth.getSession();
+  if (!session?.user) return null;
+  return ensureUserProfile(session.user);
 });
