@@ -29,7 +29,7 @@ tagsForPostsで各投稿に付いたタグのslugを取得し、
 mapPostRowでデータベースの投稿データをアプリ内のPost型に変換します。
 sortの値に応じて投稿を並べ替え、投稿データとscore、userVoteを返します。
 
-同じファイルのlistTagsはタグ一覧を取得し、
+同ファイルのlistTagsはタグ一覧を取得し、
 batchAuthorsForIdsは投稿者IDを使って投稿者情報をまとめて取得します。
 
 ------------------------------------------

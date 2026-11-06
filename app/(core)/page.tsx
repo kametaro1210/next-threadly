@@ -65,7 +65,10 @@ export default async function Home({
   return (
     <div>
       <div>
-        <FeedSortTabs />
+
+        {/* currentに現在の並び順、tagに絞り込み用のタグslugを渡す。 */}
+        <FeedSortTabs current={sort} tag={tagFilter}/>
+        
         <div className="space-y-4">
           {cards}
 
