@@ -1,0 +1,169 @@
+==========================================
+記事詳細・コメント表示と投票の流れ
+==========================================
+
+記事詳細を開いてから、コメント・返信・投票を表示／保存するまでの流れです。
+DBの中身ではなく、コード上の処理を説明します。
+
+------------------------------------------
+1. 記事詳細を開く
+------------------------------------------
+
+- app\(core)\page.tsx
+  listPostsSortedで投稿一覧を取得し、PostCardを表示します。
+
+- components\feed\post-card.tsx
+  投稿者名またはタイトルのリンク先を /post/{投稿ID} にします。
+
+- app\(core)\post\[id]\page.tsx
+  URLからidを受け取り、getPostById(id)で記事を取得します。
+  記事がなければnotFound()でNot Found画面にします。
+  記事があれば、投稿者・ログインユーザー・記事の投票状態・コメントツリーを取得し、
+  記事本文、CommentComposer、CommentThreadを表示します。
+
+[id]とは
+URLの一部を変数として受け取る動的ルートです。
+たとえば /post/abc の「abc」がidになり、DB内の投稿IDとして使われます。
+ファイル名の[id]は、特定の記事IDに限定せず同じ画面を使うための記法です。
+
+------------------------------------------
+2. コメント・返信を保存する
+------------------------------------------
+
+- components\post\comment-composer.tsx
+  新規コメントではparentIdをnullとして送信します。
+  返信ではコメントIDをparentIdとして送信します。
+  送信時にcreateCommentActionを呼び、成功後router.refresh()で画面を更新します。
+
+- lib\actions\comments.ts
+  createCommentActionがログイン状態と本文を確認します。
+  addCommentを呼び出し、postId・authorId・parentId・bodyをCommentに保存します。
+  authorIdにはログインユーザーIDを使います。
+  保存後は記事詳細とトップページを再検証します。
+
+- prisma\schema.prisma
+  commentsテーブルの主な列は次のとおりです。
+  id: コメントID（UUID）、post_id: 所属する記事ID、
+  author_id: コメントしたユーザーID、parent_id: 返信先コメントID（返信でなければNULL）、
+  body: 本文、created_at: 作成日時。
+
+  Comment.postはpost_idからposts.idへのリレーションです。
+  記事を削除すると関連コメントも削除されます（Cascade）。
+  一方、author_idとparent_idにはschema上のリレーション定義がありません。
+  parent_idは返信先を示す値として保存され、コメント同士の親子構造は表示時にコードで組み立てます。
+
+なぜコメントが木のように枝分かれするのか
+- 返信のたびにparent_idへ返信先コメントのidを保存するため、
+  どのコメントへの返信かを特定できます。
+- 記事への通常コメントはparent_idがNULLなので、ツリーの根になります。
+- 返信への返信も、その返信コメントのidをparent_idにすれば、さらに下の階層になります。
+- DBにコメント本文を階層ごとに別保存するのではなく、同じcommentsテーブルの
+  parent_idで親子を表せるため、同じ仕組みで深い返信を扱えます。
+
+------------------------------------------
+3. 返信先を決めて保存する処理フロー
+------------------------------------------
+
+- components\post\comment-node.tsx のCommentNode
+  各コメントのReplyボタンを押すと、そのコメントの返信入力欄を表示します。
+  CommentComposerにnode.idをparentIdとして渡します。
+
+- components\post\comment-composer.tsx のonSubmit
+  フォームのhidden項目としてpostIdとparentId、入力欄としてbodyを送ります。
+  記事への新規コメントではparentIdは空文字、返信ではReplyを押したコメントのidです。
+
+- lib\actions\comments.ts のcreateCommentAction
+  空のparentIdをnullに変換し、addCommentへ渡します。
+
+- lib\actions\comments.ts のaddComment
+  Prismaのprisma.comment.createでpostId、authorId、parentId、bodyを保存します。
+  返信ならparent_idに返信先のidが入り、通常コメントならNULLになります。
+  このparent_idが、後で親子を組み立てるための手がかりです。
+
+例：
+  コメントA: id=A, parent_id=NULL
+  コメントB: id=B, parent_id=NULL
+  Aへの返信: id=C, parent_id=A
+  Cへの返信: id=D, parent_id=C
+
+この場合、AとBが記事直下のコメント、CがAの子、DがCの子になります。
+parent_idが同じコメントを複数作れるため、1つの親コメントから複数の枝にも分かれます。
+
+------------------------------------------
+4. 平らなコメント一覧をツリーに変換する
+------------------------------------------
+
+- app\(core)\post\[id]\page.tsx のgetCommentTree呼び出し
+  記事IDとログインユーザーIDを渡し、画面表示用のコメントツリーを取得します。
+
+- lib\db\queries.ts のgetCommentTree
+  1. listCommentsForPost(postId)で、その記事に属するコメントをDBから取得します。
+     この時点ではparent_idを持った平らな一覧です。
+  2. batchAuthorsForIdsで投稿者情報、batchCommentScoresで投票スコアを取得します。
+     ログイン中ならbatchUserVotesForCommentsで本人の投票も取得します。
+  3. 取得情報を各コメントに加え、nestCommentRows(enriched)を呼び出します。
+
+- lib\comment-tree.ts のnestCommentRows
+  1. flatの全コメントからEnrichedCommentNodeを作ります。
+     各ノードのchildrenは空配列で、Mapにはコメントidをキーとして登録します。
+     先に全ノードをMapへ登録するため、親より先に返信が一覧にあっても親を探せます。
+  2. コメントをもう一度順に見てparentIdを確認します。
+     parentIdがあり、そのidがMapにあれば、返信ノードを親ノードのchildrenへ追加します。
+     parentIdがnull、または親ノードがMapにない場合はrootsへ追加します。
+  3. rootsと各ノードのchildrenを、sortChで作成日時の古い順に並べます。
+     sortChは子のchildrenにも再帰的に実行されます。
+  4. 返信をchildrenに持つルート一覧rootsを返します。
+
+ここで重要なのは、parent_idはDBに保存される返信先の記録であり、
+childrenは画面表示用にnestCommentRowsが実行時に組み立てる配列だという点です。
+DBにchildren列や階層番号を保存するわけではありません。
+
+------------------------------------------
+5. ツリーを画面に描画する
+------------------------------------------
+
+- components\post\comment-thread.tsx のCommentThread
+  getCommentTreeから受け取ったルート一覧を表示します。
+  ルートが0件なら「まだコメントがありません。」を表示します。
+
+- components\post\comment-node.tsx のCommentNode
+  1つのコメントと返信を描画する部品です。
+  node.childrenが1件以上ある場合、そのchildrenをmapで順に表示し、
+  各返信に対してCommentNodeをもう一度呼び出します。
+  この再帰呼び出しにより、返信の返信も同じ部品で描画されます。
+  返信がないノードではchildrenが空なので、そこで表示が終わります。
+
+全体の処理フロー
+1. Replyボタンが押されたコメントのidを、CommentComposerのparentIdに渡す。
+2. createCommentActionからaddCommentへparentIdを渡し、comments.parent_idに保存する。
+3. getCommentTreeが記事のコメントを取得し、nestCommentRowsがparentIdを使ってchildrenを作る。
+4. CommentThreadがルートを表示し、CommentNodeがchildrenを再帰表示する。
+5. その結果、親コメントごとに返信がまとまり、複数の返信や深い返信が枝分かれして見える。
+
+------------------------------------------
+6. コメント投票が保存・表示される流れ
+------------------------------------------
+
+- components\feed\vote-buttons.tsx
+  コメントの賛成はvote(1)、反対はvote(-1)を呼びます。
+  targetがcommentならvoteCommentActionにコメントIDと投票値を渡し、
+  処理後router.refresh()で表示を更新します。
+
+- lib\actions\comments.ts
+  voteCommentActionはログインユーザーとコメントの存在を確認してからvoteCommentを呼びます。
+  voteCommentは同じユーザー・コメントの現在の投票を調べます。
+  同じ値を再度選ぶと投票を取り消し、異なる値なら反対／賛成を切り替えます。
+  保存後、記事詳細とトップページを再検証します。
+
+- prisma\schema.prisma
+  votesテーブルにはuser_id、target_type、target_id、valueを保存します。
+  コメント投票ではtarget_typeが"comment"、target_idがコメントID、
+  valueは賛成が1、反対が-1です。
+  user_id・target_type・target_idの組み合わせが主キーなので、
+  同じユーザーが同じコメントに複数の投票を持つことはできません。
+  target_idはPostやCommentへの外部キーではなく、target_typeと組み合わせて対象を識別します。
+
+投票スコアはcommentsに保存する列ではありません。votes.valueの合計から表示時に計算します。
+そのため賛成2票・反対1票ならscoreは1です。
+ログイン中のユーザーの投票値はuserVoteとして取得し、ボタンの状態に使います。
+未ログインの場合、表示上のuserVoteは0で、サーバー側Actionが投票を拒否します。

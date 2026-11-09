@@ -1,0 +1,119 @@
+
+==========================================
+投票機能(Vote)の処理の流れ
+==========================================
+
+このメモでは、トップページで投稿へ賛成・反対を投票し、
+投票結果を画面に反映するまでを説明します。
+
+------------------------------------------
+1. トップページで投稿と投票状態を取得する
+------------------------------------------
+
+- app\(core)\page.tsx
+URLからHot・New・Topとタグ条件を読み取ります。
+getSessionUserでログインユーザーを取得し、
+listPostsSortedに並び順・タグ・ユーザーIDを渡します。
+返された投稿、score、userVoteをPostCardに渡します。
+
+- lib\db\queries.ts
+listPostsSortedは、まずタグ条件に合う投稿を新しい順に最大50件取得します。
+その投稿を対象にvoteSumsForPostsで投票スコアを集計し、
+userVotesForPostsでログインユーザー本人の投票値を取得します。
+取得したscoreとuserVoteを画面表示用にまとめます。
+
+Hot・New・Topの並び替えは、この関数内で行います。
+- New：投稿日時の新しい順。
+- Top：scoreの高い順。同点の場合はコメント数、投稿日時の順。
+- Hot：score＋コメント数×2の高い順。同点の場合は投稿日時の順。
+並び替えの対象は、先に取得した最大50件です。
+FeedSortTabs（components\feed\feed-sord-tabs.tsx）はタブのURLを切り替える役割で、
+実際の並び替えはlistPostsSortedが行います。
+
+- components\feed\post-card.tsx
+投稿カードにVoteButtonsを配置し、投稿ID・score・userVoteを渡します。
+
+- lib\types.ts
+FeedSortはHot・New・Top、VoteTargetはpost・commentを表す型です。
+DBの値を変更する処理ではありません。
+
+------------------------------------------
+2. ボタンを押して投票を保存する
+------------------------------------------
+
+- components\feed\vote-buttons.tsx
+賛成ボタンはvote(1)、反対ボタンはvote(-1)を呼び出します。
+targetがpostならvotePostAction、commentならvoteCommentActionに
+対象IDと投票値を渡します。処理中はpendingによりボタンを一時的に無効にします。
+処理後のrouter.refresh()でページデータを再取得し、表示を更新します。
+
+- lib\actions\posts.ts
+votePostActionはgetCurrentUserIdでログインユーザーIDを確認します。
+ログインしていなければ投票処理をせずエラーを返します。
+ログイン中ならvotePostを呼び、トップページと投稿詳細ページを再検証します。
+
+votePostはgetUserVoteで現在の投票値を確認します。
+今回と同じ値なら次の値を0（投票なし）にし、異なる値なら今回の値にします。
+そのユーザー・投稿に該当するvotes行を削除してから、次の値が0以外の場合だけ
+新しい行を作成します。
+
+- lib\actions\comments.ts
+コメントへの投票はvoteCommentActionとvoteCommentが担当します。
+ログイン確認後に対象コメントの存在を確認し、投稿と同じ切り替え方法で投票を保存します。
+
+- lib\db\queries.ts、lib\comment-tree.ts
+getCommentTreeはコメント・投稿者・コメントscore・本人の投票値を集め、
+nestCommentRowsに渡します。nestCommentRowsはparentIdを使って返信を親コメントの
+childrenにまとめ、各階層を古い順に並べます。
+ただし、現在のapp・componentsにはgetCommentTreeの呼び出しや
+target="comment"のVoteButtons配置がありません。コメント投票の処理はありますが、
+トップページの投稿投票のように画面から呼び出される状態ではありません。
+
+------------------------------------------
+3. scoreとDBの変化
+------------------------------------------
+
+- prisma\schema.prisma
+Voteモデルはvotesテーブルに対応します。
+user_id（投票者）、target_type（postまたはcomment）、target_id（対象ID）、
+value（1または-1）を保存します。
+
+user_id・target_type・target_idの組み合わせが主キーなので、
+同じユーザーが同じ対象に複数の投票行を持つことはできません。
+
+- lib\db\queries.ts
+voteSumsForPostsは、対象投稿のvotes行にあるvalueを合計します。
+scoreは賛成票の数から反対票の数を引いた値です（例：賛成3票、反対1票ならscoreは2）。
+投票がない場合は0です。score専用のDBカラムはなく、表示・並び替え時に集計します。
+
+投票時の変化：
+- 未投票から賛成／反対：votes行を1件作成し、valueを1／-1にする。
+- 同じボタンをもう一度押す：既存行を削除し、再作成しない（投票を取り消す）。
+  そのため、同じ票が重ねて加算されません。
+- 反対から賛成、または賛成から反対：既存行を削除し、valueを反対側にして作り直す。
+
+------------------------------------------
+4. 未ログイン時の動作と画面更新
+------------------------------------------
+
+投票をサーバー側で止める箇所は、lib\actions\posts.tsのvotePostActionと
+lib\actions\comments.tsのvoteCommentActionにあるgetCurrentUserIdと
+「if (!userId)」の確認です。未ログインの場合、votesテーブルは変更されません。
+
+ただし、現在のVoteButtonsは未ログインを理由にボタンを無効化していません。
+画面上では押せますが、サーバー側で投票を拒否する実装です。
+「未ログイン時はボタン自体を押せなくする」動作とは異なります。
+
+ログイン中に投票が保存されると、Server Actionが対象ページを再検証し、
+VoteButtonsのrouter.refresh()がページデータを再取得します。
+その結果、scoreと本人の投票状態が更新されて表示されます。
+
+------------------------------------------
+全体の流れ
+------------------------------------------
+
+1. トップページが投稿、score、ログインユーザーのuserVoteを取得する。
+2. PostCard内のVoteButtonsで賛成または反対を選ぶ。
+3. Server Actionがログインを確認し、votePostでvotes行を登録・更新・削除する。
+4. ページを再取得し、votes.valueの合計から算出したscoreを表示する。
+
