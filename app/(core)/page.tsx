@@ -1,7 +1,9 @@
 import { FeedSortTabs } from "@/components/feed/feed-sord-tabs";
 import { PostCard } from "@/components/feed/post-card";
+import { RightTrending } from "@/components/layout/right-trending";
 import { getSessionUser } from "@/lib/auth";
 import { batchAuthorsForIds, listPostsSorted, listTags } from "@/lib/db/queries";
+import { getTrendingToday } from "@/lib/trending";
 import { FeedSort } from "@/lib/types";
 
 
@@ -47,6 +49,9 @@ export default async function Home({
     authorById.set(sessionUser.id, sessionUser);
   }
 
+  // 順位・トピック名・投稿数を持つ今日のトレンド一覧を取得
+  const trending = getTrendingToday();
+
   const cards = rows.map((row) => {
     const author = authorById.get(row.post.authorId);
     if (!author) return null;
@@ -63,8 +68,8 @@ export default async function Home({
   });
 
   return (
-    <div>
-      <div>
+    <div className="flex items-start gap-8">
+      <div className="min-w-0 flex-1">
 
         {/* currentに現在の並び順、tagに絞り込み用のタグslugを渡す。 */}
         <FeedSortTabs current={sort} tag={tagFilter}/>
@@ -80,6 +85,10 @@ export default async function Home({
           )}
         </div>
       </div>
+
+      <aside className="hidden w-72 shrink-0 space-y-6 lg:block">
+        <RightTrending items={trending} />
+      </aside>
     </div>
   );
 }
