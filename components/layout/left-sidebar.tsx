@@ -1,20 +1,22 @@
 "use client";
 
+import { Tag } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Flame, Home, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { JoinCtaCard } from "./join-cta-card";
 import { LeftTags } from "./left-tags";
-// import { LeftTags } from "./left-tags";
 
 const m_nav = [
-  { href: "/", 
+  { 
+    href: "/", 
     label: "Home", 
     icon: Home, 
     match: "home" as const 
   },
-  { href: "/?sort=hot", 
+  { 
+    href: "/?sort=hot", 
     label: "Popular", 
     icon: Flame, 
     match: "hot" as const 
@@ -29,9 +31,12 @@ const m_nav = [
 
 export function LeftSidebar({
   showCta,
-  // tagsWithCounts,
+  tagsWithCounts,
 }: {
+  // ログインしていない状態(true)なら参加案内カードを表示する。
   showCta: boolean;
+  // タグ情報と、そのタグが付いた投稿数の一覧。LeftTagsに渡して表示する。
+  tagsWithCounts: { tag: Tag; count: number }[];
 }) {
 
 // 現在のURLのパス名を取得する（例: "/posts" など）
@@ -87,7 +92,7 @@ export function LeftSidebar({
           Top Tags
         </p>
 
-        <LeftTags />
+        <LeftTags items={tagsWithCounts}/>
       </div>
 
       {/* showCtaがtrue（未ログイン時）のみ、参加案内カードを表示 */}

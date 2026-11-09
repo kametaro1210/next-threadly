@@ -202,7 +202,7 @@ async function tagsForPosts(postIds: string[]): Promise<Map<string, string[]>> {
   4. 各タグ情報と件数を組み合わせた配列を返す。
 */
 
-export async function tagPostCounts(): Promise<{ tag: Tag; count: number }[]> {
+export async function tagPostCounts(): Promise<{ tag: Tag; count: number }[]> { 
   const allTags = await listTags();
   const rows = await prisma.postTag.groupBy({
     by: ["tagSlug"],

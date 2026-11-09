@@ -64,7 +64,7 @@ export function formatRelativeTime(iso: string): string {
   2. 1,000未満なら、nを文字列に変換して返す。
 */
 
-export function formatCount(n: number): string {
+export function formatCount(n: number): string { 
   // nが100万以上なら、100万単位にして小数第1位までの「m」表記で返す。
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}m`;
 
