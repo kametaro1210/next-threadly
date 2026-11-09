@@ -102,7 +102,7 @@ export async function votePost(
 
 export type PostFormState = { error?: string } | null;
 
-export async function createPostAction(
+export async function createPostAction( 
   _prev: PostFormState,
   formData: FormData,
 ): Promise<PostFormState> {
