@@ -75,7 +75,7 @@ export default async function Home({
           {/* 投稿がない場合の表示 */}
           {rows.length === 0 && (
             <p className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-              No posts match this filter.
+              投稿がまだありません
             </p>
           )}
         </div>

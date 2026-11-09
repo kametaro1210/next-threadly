@@ -45,25 +45,25 @@ export async function batchAuthorsForIds(
   // ----------------------------------------------------------------------------------
 
 /*
-  タグ一覧を取得する処理
+  タグ一覧を取得する処理 
 
   【引数】
   - なし。
 
   【処理フロー】
-  1. Prismaでタグをすべて検索する（where条件はなく、slugの昇順に並べる）。
+  1. Prismaでタグをすべて検索する（where条件はなく、slugの昇順に並べる）。 
   2. 各行からslug（識別子）・label（表示名）・hashColor（表示色）を取り出す。
-  3. 画面表示などで使うTag型の配列を返す。
+  3. 画面表示などで使うTag型の配列を返す。 
 */
 
-export async function listTags(): Promise<Tag[]> {
+export async function listTags(): Promise<Tag[]> { 
   const rows = await prisma.tag.findMany({ orderBy: { slug: "asc" } });
   return rows.map((tag) => ({
-    slug: tag.slug,
+    slug: tag.slug, 
     label: tag.label,
     hashColor: tag.hashColor,
   }));
-}
+} 
 
   // ----------------------------------------------------------------------------------
 
@@ -248,67 +248,67 @@ async function commentCountsForPosts(
   // ----------------------------------------------------------------------------------
 
 /*
-  IDを指定して投稿を取得する処理
+  IDを指定して投稿を取得する処理 
 
   【引数】
-  - id：取得したい投稿のID。
+  - id：取得したい投稿のID。 
 
   【処理フロー】
-  1. Prismaで投稿IDが引数idと一致する投稿を1件検索する。見つからなければundefinedを返す。
-  2. 投稿が見つかった場合、そのIDを使ってタグ一覧とコメント数を取得する。
+  1. Prismaで投稿IDが引数idと一致する投稿を1件検索する。見つからなければundefinedを返す。 
+  2. 投稿が見つかった場合、そのIDを使ってタグ一覧とコメント数を取得する。 
   3. 投稿のDBデータにタグslugとコメント数を加え、アプリ内で使うPost型に変換して返す。
 */
 
-export async function getPostById(id: string): Promise<Post | undefined> {
+export async function getPostById(id: string): Promise<Post | undefined> { 
   const row = await prisma.post.findUnique({ where: { id } });
   if (!row) return undefined;
 
-  const [tagMap, ccMap] = await Promise.all([
+  const [tagMap, ccMap] = await Promise.all([ 
     tagsForPosts([id]),
     commentCountsForPosts([id]),
   ]);
 
-  return mapPostRow(row, tagMap.get(id) ?? [], ccMap.get(id) ?? 0);
+  return mapPostRow(row, tagMap.get(id) ?? [], ccMap.get(id) ?? 0); 
 }
 
   // ----------------------------------------------------------------------------------
 
 /*
-  IDを指定して投稿者情報を取得する処理
+  IDを指定して投稿者情報を取得する処理 
 
   【引数】
-  - authorId：情報を取得したい投稿者のユーザーID。
+  - authorId：情報を取得したい投稿者のユーザーID。 
 
   【処理フロー】
-  1. PrismaでユーザーIDがauthorIdと一致するユーザーを1件検索する。
+  1. PrismaでユーザーIDがauthorIdと一致するユーザーを1件検索する。 
   2. 見つかった場合はDBのIDとユーザー名を返す。見つからない場合は引数のIDと、その一部を使った仮のユーザー名を返す。
 */
 
-export async function getAuthorById(authorId: string): Promise<User> {
+export async function getAuthorById(authorId: string): Promise<User> { 
   const row = await prisma.userProfile.findUnique({ where: { id: authorId } });
   return row
     ? { id: row.id, username: row.username }
-    : { id: authorId, username: `user_${authorId.slice(0, 6)}` };
+    : { id: authorId, username: `user_${authorId.slice(0, 6)}` }; 
 }
 
   // ----------------------------------------------------------------------------------
 
 /*
-  投稿の投票スコアを取得する処理
+  投稿の投票スコアを取得する処理 
 
   【引数】
-  - postId：投票スコアを取得したい投稿のID。
+  - postId：投票スコアを取得したい投稿のID。 
 
   【処理フロー】
   1. PrismaでtargetTypeが"post"かつtargetIdがpostIdの投票だけを対象にする。
-  2. 対象のvalueを合計し、投票がない場合（合計がnull）は0にして数値で返す。
+  2. 対象のvalueを合計し、投票がない場合（合計がnull）は0にして数値で返す。 
 */
-export async function getPostScore(postId: string): Promise<number> {
+export async function getPostScore(postId: string): Promise<number> { 
   const agg = await prisma.vote.aggregate({
     where: { targetType: "post", targetId: postId },
     _sum: { value: true },
   });
-  return Number(agg._sum.value ?? 0);
+  return Number(agg._sum.value ?? 0); 
 }
 
   // ----------------------------------------------------------------------------------
@@ -491,76 +491,76 @@ function mapPostRow(
   // ----------------------------------------------------------------------------------
 
 /*
-  ユーザーが対象に投票した値を取得する処理
+  ユーザーが対象に投票した値を取得する処理 
 
   【引数】
   - userId：投票したユーザーのID。undefinedの場合は未ログイン。
-  - type：投票対象の種類（投稿またはコメント）。
+  - type：投票対象の種類（投稿またはコメント）。 
   - targetId：投票対象となる投稿またはコメントのID。
 
   【処理フロー】
-  1. userIdがない（未ログイン）場合は、投票なしを表す0を返す。
+  1. userIdがない（未ログイン）場合は、投票なしを表す0を返す。 
   2. PrismaでuserId・targetType（type）・targetIdがすべて一致する投票を1件検索する。
-  3. 投票値が-1または1ならその値を返し、投票がない場合やそれ以外の値の場合は0を返す。
+  3. 投票値が-1または1ならその値を返し、投票がない場合やそれ以外の値の場合は0を返す。 
 */
 
-export async function getUserVote(
+export async function getUserVote( 
   userId: string | undefined,
   type: VoteTarget,
-  targetId: string,
+  targetId: string, 
 ): Promise<-1 | 0 | 1> {
   if (!userId) return 0;
 
-  const row = await prisma.vote.findUnique({
+  const row = await prisma.vote.findUnique({ 
     where: {
       userId_targetType_targetId: {
         userId,
         targetType: type,
-        targetId,
+        targetId, 
       },
     },
-  });
+  }); 
 
   const voteValue = row?.value;
 
-  return voteValue === -1 || voteValue === 1 ? voteValue : 0;
+  return voteValue === -1 || voteValue === 1 ? voteValue : 0; 
 }
 
   // ----------------------------------------------------------------------------------
 
 /*
-  投稿のコメントを投票・投稿者情報付きのツリーにする処理
+  投稿のコメントを投票・投稿者情報付きのツリーにする処理 
 
   【引数】
   - postId：コメントを取得する投稿のID。
   - sessionUserId：ログインユーザーのID。省略時はユーザーごとの投票を取得しない。
 
   【処理フロー】
-  1. postIdに属するコメント一覧を取得し、0件なら空の配列を返す。
+  1. postIdに属するコメント一覧を取得し、0件なら空の配列を返す。 
   2. コメントから重複のない投稿者IDとコメントIDを作り、
       それぞれ投稿者情報と投票スコアを取得する。
-  3. sessionUserIdがある場合はそのユーザーの各コメントへの投票も取得し、
+  3. sessionUserIdがある場合はそのユーザーの各コメントへの投票も取得し、 
       ない場合は全コメントを投票なし（0）として扱う。
   4. 各コメントに投稿者・スコア・本人の投票を加える。
-    投稿者情報を取得できないコメントは除外する。
+    投稿者情報を取得できないコメントは除外する。 
   5. nestCommentRowsでparentIdを使って返信を親コメントのchildrenにまとめ、
       親子関係のツリーを返す。
 */
 
-export async function getCommentTree(
+export async function getCommentTree( 
   postId: string,
   sessionUserId?: string,
 ): Promise<EnrichedCommentNode[]> {
-  const flat = await listCommentsForPost(postId);
+  const flat = await listCommentsForPost(postId); 
   if (flat.length === 0) return [];
   const authorIds = [...new Set(flat.map((comment) => comment.authorId))];
-  const authorMap = await batchAuthorsForIds(authorIds);
+  const authorMap = await batchAuthorsForIds(authorIds); 
 
   const commentIds = flat.map((comment) => comment.id);
   const scoreMap = await batchCommentScores(commentIds);
   const voteMap = sessionUserId
     ? await batchUserVotesForComments(sessionUserId, commentIds)
-    : new Map<string, -1 | 0 | 1>();
+    : new Map<string, -1 | 0 | 1>(); 
 
   const enriched = flat
     .map((comment) => {
@@ -569,17 +569,17 @@ export async function getCommentTree(
 
       return {
         ...comment,
-        author,
+        author, 
         score: scoreMap.get(comment.id) ?? 0,
         userVote: (voteMap.get(comment.id) ?? 0) as -1 | 0 | 1,
       };
     })
-    .filter(
+    .filter( 
       (enrichedComment): enrichedComment is NonNullable<typeof enrichedComment> =>
         enrichedComment !== null,
     );
 
-  return nestCommentRows(enriched);
+  return nestCommentRows(enriched); 
 }
 
   // ----------------------------------------------------------------------------------

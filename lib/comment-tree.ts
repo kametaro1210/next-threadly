@@ -11,20 +11,20 @@ import { Comment, User } from "./types";
   childrenには、そのコメントへの返信が入る。
 */
 
-// -----------------------------------------------------------------------
-
 export type EnrichedCommentNode = {
   id: string;
-  postId: string;
+  postId: string; 
   parentId: string | null;
-  body: string;
+  body: string; 
   createdAt: string;
   authorId: string;
-  author: User;
+  author: User; 
   score: number;
-  userVote: -1 | 0 | 1;
+  userVote: -1 | 0 | 1; 
   children: EnrichedCommentNode[];
 };
+
+// -----------------------------------------------------------------------
 
 /*
   投稿者・投票情報付きのコメント一覧をツリーに変換する処理

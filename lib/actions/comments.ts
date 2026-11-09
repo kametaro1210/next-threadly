@@ -6,41 +6,43 @@ import { getUserVote } from "../db/queries";
 import { prisma } from "../prisma";
 import { Comment } from "../types";
 
-export type CommentFormState = { error?: string; ok?: boolean } | null;
 
 /*
-  フォームからコメントを作成するServer Action
+  フォームからコメントを作成するServer Action 
 
   【引数】
   - _prev：前回のフォーム状態。Actionの引数として受け取るが、この処理では使用しない。
-  - formData：フォームから送られる投稿ID・返信先ID・コメント本文。
+  - formData：フォームから送られる投稿ID・返信先ID・コメント本文。 
 
   【処理フロー】
-  1. ログインユーザーのIDを取得し、未ログインならエラーを返す。
+  1. ログインユーザーのIDを取得し、未ログインならエラーを返す。 
   2. formDataから投稿ID・返信先ID・本文を文字列として取り出す。
   3. 投稿IDがない、または本文が空白だけならエラーを返す。
   4. 返信先IDが空または"null"ならnullにし、それ以外は返信先IDとして扱う。
   5. addCommentを呼び出してコメントを保存する。作成者IDにはログインユーザーのIDを使う。
-  6. 投稿詳細ページとトップページのキャッシュを更新し、成功状態を返す。
+  6. 投稿詳細ページとトップページのキャッシュを更新し、成功状態を返す。 
 */
 
-export async function createCommentAction(
+export type CommentFormState = { error?: string; ok?: boolean } | null;
+
+export async function createCommentAction( 
   _prev: CommentFormState,
   formData: FormData,
 ): Promise<CommentFormState> {
   const userId = await getCurrentUserId();
   if (!userId) {
-    return { error: "You must be signed in to comment." };
+    return { error: "ログインをしてからコメントを入力してください" };
   }
 
   const postId = String(formData.get("postId") ?? "");
-  const parentIdRaw = String(formData.get("parentId") ?? "");
+  const parentIdRaw = String(formData.get("parentId") ?? ""); 
   const body = String(formData.get("body") ?? "");
 
   if (!postId || body.trim().length < 1) {
-    return { error: "Comment cannot be empty." };
+    return { error: "コメントを入力してください" };
   }
 
+  // 返信先IDが空または"null"なら通常コメントとしてnull、それ以外なら返信先IDを設定する。
   const parentId = parentIdRaw && parentIdRaw !== "null" ? parentIdRaw : null;
 
   await addComment({ postId, authorId: userId, parentId, body });
